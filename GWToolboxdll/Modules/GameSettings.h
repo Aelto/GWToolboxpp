@@ -5,23 +5,24 @@
 #include <GWCA/Utilities/Hook.h>
 
 #include <Color.h>
-#include <Timer.h>
 #include <ToolboxModule.h>
 
-#define NAMETAG_COLOR_DEFAULT_NPC 0xFFA0FF00
-#define NAMETAG_COLOR_DEFAULT_PLAYER_SELF 0xFF40FF40
-#define NAMETAG_COLOR_DEFAULT_PLAYER_OTHER 0xFF9BBEFF
-#define NAMETAG_COLOR_DEFAULT_PLAYER_IN_PARTY 0xFF6060FF
-#define NAMETAG_COLOR_DEFAULT_GADGET 0xFFFFFF00
-#define NAMETAG_COLOR_DEFAULT_ENEMY 0xFFFF0000
-#define NAMETAG_COLOR_DEFAULT_ITEM 0x0
+enum class DEFAULT_NAMETAG_COLOR : Color {
+    NPC = 0xFFA0FF00,
+    PLAYER_SELF = 0xFF40FF40,
+    PLAYER_OTHER = 0xFF9BBEFF,
+    PLAYER_IN_PARTY = 0xFF6060FF,
+    GADGET = 0xFFFFFF00,
+    ENEMY = 0xFFFF0000,
+    ITEM = 0x0,
+};
 
 namespace GW {
     struct Item;
     struct Friend;
     enum class FriendStatus : uint32_t;
     namespace Constants {
-        enum class SkillID;
+        enum class SkillID : uint32_t;
     }
     namespace UI {
         enum class UIMessage : uint32_t;
@@ -73,13 +74,12 @@ public:
     void OnPlayerJoinInstance(GW::HookStatus*, GW::Packet::StoC::PlayerJoinInstance*) const;
     void OnPartyInviteReceived(GW::HookStatus*, GW::Packet::StoC::PartyInviteReceived_Create*) const;
     void OnPartyPlayerJoined(GW::HookStatus*, GW::Packet::StoC::PartyPlayerAdd*);
-    void OnLocalChatMessage(GW::HookStatus*, GW::Packet::StoC::MessageLocal*);
+    void OnLocalChatMessage(GW::HookStatus*, GW::Packet::StoC::MessageLocal*) const;
     void OnServerMessage(GW::HookStatus*, GW::Packet::StoC::MessageServer*) const;
-    void OnGlobalMessage(GW::HookStatus*, GW::Packet::StoC::MessageGlobal*) const;
     void OnScreenShake(GW::HookStatus*, void* packet) const;
     void OnWriteChat(GW::HookStatus* status, GW::UI::UIMessage msgid, void* wParam, void*) const;
     void OnAgentStartCast(GW::HookStatus* status, GW::UI::UIMessage, void*, void*) const;
-    void OnOpenWiki(GW::HookStatus*, GW::UI::UIMessage, void*, void*);
+    void OnOpenWiki(GW::HookStatus*, GW::UI::UIMessage, void*, void*) const;
     void OnCast(GW::HookStatus *, uint32_t agent_id, uint32_t slot, uint32_t target_id, uint32_t call_target) const;
     void OnAgentAdd(GW::HookStatus* status, GW::Packet::StoC::AgentAdd* packet) const;
     void OnUpdateAgentState(GW::HookStatus* status, GW::Packet::StoC::AgentState* packet) const;
@@ -89,11 +89,7 @@ public:
     void CmdReinvite(const wchar_t* message, int argc, LPWSTR* argv) const;
 
 
-
 private:
-
-
-    void UpdateFOV() const;
     void FactionEarnedCheckAndWarn();
     bool faction_checked = false;
 
@@ -125,6 +121,7 @@ private:
     GW::HookEntry AgentAdd_Entry;
     GW::HookEntry TradeStart_Entry;
     GW::HookEntry PartyPlayerAdd_Entry;
+    GW::HookEntry PartyPlayerReady_Entry;
     GW::HookEntry PartyPlayerRemove_Entry;
     GW::HookEntry GameSrvTransfer_Entry;
     GW::HookEntry CinematicPlay_Entry;

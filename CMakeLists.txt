@@ -6,7 +6,7 @@ project(gwtoolbox)
 
 set(GWTOOLBOXEXE_VERSION "4.0")
 set(GWTOOLBOXDLL_VERSION "6.8")
-set(GWTOOLBOXDLL_VERSION_BETA "beta1") # can be anything. Marks beta version if not empty.
+set(GWTOOLBOXDLL_VERSION_BETA "") # can be anything. Marks beta version if not empty.
 set(GWTOOBOX_MODULE_VERSION "6,8,0,0") # used for Dll module info. See GWToolboxdll/GWToolbox.rc
 
 # this is no longer required, but in case we have to add an installer again some day
@@ -46,6 +46,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin/")
 
 include(gwca)
 include(imgui)
+include(wintoast)
 include(directxtex)
 include(utf8proc)
 include(easywsclient)

@@ -39,8 +39,6 @@ namespace {
 
     utf8::string imgui_inifile;
 
-
-
     bool must_self_destruct = false;    // is true when toolbox should quit
     GW::HookEntry Update_Entry;
     GW::HookEntry HandleCrash_Entry;
@@ -85,10 +83,9 @@ namespace {
         ImGui_ImplDX9_Init(device);
         ImGui_ImplWin32_Init(GW::MemoryMgr::GetGWWindowHandle());
 
-        GW::Render::SetResetCallback([](IDirect3DDevice9* device) {
-            UNREFERENCED_PARAMETER(device);
+        GW::Render::SetResetCallback([](const IDirect3DDevice9*) {
             ImGui_ImplDX9_InvalidateDeviceObjects();
-            });
+        });
 
         ImGuiIO& io = ImGui::GetIO();
         io.MouseDrawCursor = false;
@@ -126,12 +123,9 @@ namespace {
 
     std::vector<ToolboxModule*> modules_terminating{};
     void ReorderModules(std::vector<ToolboxModule*>& modules) {
-        std::sort(
-            modules.begin(),
-            modules.end(),
-            [](const ToolboxModule* lhs, const ToolboxModule* rhs) {
-                return std::string(lhs->SettingsName()).compare(rhs->SettingsName()) < 0;
-            });
+        std::ranges::sort(modules, [](const ToolboxModule* lhs, const ToolboxModule* rhs) {
+            return std::string(lhs->SettingsName()).compare(rhs->SettingsName()) < 0;
+        });
     }
 
     ToolboxIni* OpenSettingsFile(std::filesystem::path config = GWTOOLBOX_INI_FILENAME, bool fresh = false)
@@ -149,18 +143,17 @@ namespace {
             fresh = true;
         if (fresh) {
             // inifile is cached, unless path for config has changed.
-            ToolboxIni* tmp = new ToolboxIni(false, false, false);
+            const auto tmp = new ToolboxIni(false, false, false);
             ASSERT(tmp->LoadIfExists(full_path) == SI_OK);
             tmp->location_on_disk = full_path;
-            if (inifile)
-                delete inifile;
+            delete inifile;
             inifile = tmp;
         }
         return inifile;
     }
 
     bool ToggleTBModule(ToolboxModule& m, std::vector<ToolboxModule*>& vec, bool enable) {
-        auto found = std::ranges::find(vec.begin(), vec.end(), &m);
+        const auto found = std::ranges::find(vec, &m);
         if (found != vec.end()) {
             // Module found
             if (enable)
@@ -176,7 +169,7 @@ namespace {
             // Module not found
             if (!enable)
                 return false;
-            auto is_terminating = std::ranges::find(modules_terminating.begin(), modules_terminating.end(), &m);
+            const auto is_terminating = std::ranges::find(modules_terminating, &m);
             if (is_terminating != modules_terminating.end())
                 return false; // Not finished terminating
             vec.push_back(&m);
@@ -214,7 +207,7 @@ const std::vector<ToolboxWidget*>& GWToolbox::GetWidgets()
 void UpdateEnabledWidgetVectors(ToolboxModule* m, bool added) {
 
     auto UpdateVec = [added](std::vector<void*>& vec, void* m) {
-        auto found = std::ranges::find(vec.begin(), vec.end(), m);
+        const auto found = std::ranges::find(vec, m);
         if (added) {
             if (found == vec.end()) {
                 vec.push_back(m);
@@ -226,33 +219,33 @@ void UpdateEnabledWidgetVectors(ToolboxModule* m, bool added) {
             }
         }
     };
-    UpdateVec((std::vector<void*>&)all_modules_enabled, m);
+    UpdateVec(reinterpret_cast<std::vector<void*>&>(all_modules_enabled), m);
     if (m->IsUIElement()) {
-        UpdateVec((std::vector<void*>&)ui_elements_enabled, m);
+        UpdateVec(reinterpret_cast<std::vector<void*>&>(ui_elements_enabled), m);
         if(m->IsWidget()) {
-            UpdateVec((std::vector<void*>&)widgets_enabled, m);
+            UpdateVec(reinterpret_cast<std::vector<void*>&>(widgets_enabled), m);
         }
         if(m->IsWindow()) {
-            UpdateVec((std::vector<void*>&)windows_enabled, m);
+            UpdateVec(reinterpret_cast<std::vector<void*>&>(windows_enabled), m);
         }
     }
     else {
-        UpdateVec((std::vector<void*>&)modules_enabled, m);
+        UpdateVec(reinterpret_cast<std::vector<void*>&>(modules_enabled), m);
     }
 }
 bool GWToolbox::IsInitialized() const { return initialized; }
 bool GWToolbox::ToggleModule(ToolboxWidget& m, bool enable) {
-    bool added = ToggleTBModule(m, (std::vector<ToolboxModule*>&)widgets_enabled, enable);
+    const bool added = ToggleTBModule(m, reinterpret_cast<std::vector<ToolboxModule*>&>(widgets_enabled), enable);
     UpdateEnabledWidgetVectors(&m, added);
     return added;
 }
 bool GWToolbox::ToggleModule(ToolboxWindow& m, bool enable) {
-    bool added = ToggleTBModule(m, (std::vector<ToolboxModule*>&)windows_enabled, enable);
+    const bool added = ToggleTBModule(m, reinterpret_cast<std::vector<ToolboxModule*>&>(windows_enabled), enable);
     UpdateEnabledWidgetVectors(&m, added);
     return added;
 }
 bool GWToolbox::ToggleModule(ToolboxModule& m, bool enable) {
-    bool added = ToggleTBModule(m, modules_enabled, enable);
+    const bool added = ToggleTBModule(m, modules_enabled, enable);
     UpdateEnabledWidgetVectors(&m, added);
     return added;
 }
@@ -506,33 +499,35 @@ void GWToolbox::Initialize()
     initialized = true;
 }
 
-void GWToolbox::LoadSettings(std::filesystem::path config, bool fresh) const
+std::filesystem::path GWToolbox::LoadSettings(const std::filesystem::path& config, const bool fresh)
 {
     const auto ini = OpenSettingsFile(config, fresh);
-    for (auto m : modules_enabled) {
+    for (const auto m : modules_enabled) {
         m->LoadSettings(ini);
     }
-    for (auto m : widgets_enabled) {
+    for (const auto m : widgets_enabled) {
         m->LoadSettings(ini);
     }
-    for (auto m : windows_enabled) {
+    for (const auto m : windows_enabled) {
         m->LoadSettings(ini);
     }
+    return ini->location_on_disk;
 }
-void GWToolbox::SaveSettings(std::filesystem::path config) const
+std::filesystem::path GWToolbox::SaveSettings(const std::filesystem::path& config) const
 {
     const auto ini = OpenSettingsFile(config, false);
-    for (auto m : modules_enabled) {
+    for (const auto m : modules_enabled) {
         m->SaveSettings(ini);
     }
-    for (auto m : widgets_enabled) {
+    for (const auto m : widgets_enabled) {
         m->SaveSettings(ini);
     }
-    for (auto m : windows_enabled) {
+    for (const auto m : windows_enabled) {
         m->SaveSettings(ini);
     }
     ASSERT(Resources::SaveIniToFile(ini->location_on_disk, ini) == 0);
     Log::LogW(L"Toolbox settings saved to %s", ini->location_on_disk.wstring().c_str());
+    return ini->location_on_disk;
 }
 
 void GWToolbox::StartSelfDestruct()
@@ -630,7 +625,7 @@ void GWToolbox::Draw(IDirect3DDevice9* device) {
         io.AddKeyEvent(ImGuiKey_ModShift, (GetKeyState(VK_SHIFT) & 0x8000) != 0);
         io.AddKeyEvent(ImGuiKey_ModAlt, (GetKeyState(VK_MENU) & 0x8000) != 0);
 
-        for (auto uielement : ui_elements_enabled) {
+        for (const auto uielement : ui_elements_enabled) {
             if (world_map_showing && !uielement->ShowOnWorldMap())
                 continue;
             uielement->Draw(device);
@@ -670,16 +665,16 @@ void GWToolbox::Update(GW::HookStatus *)
         && imgui_initialized
         && !must_self_destruct) {
 
-        for (auto m : all_modules_enabled) {
+        for (const auto m : all_modules_enabled) {
             m->Update(delta_f);
         }
 
     }
 
-    for (auto m : modules_terminating) {
+    for (const auto m : modules_terminating) {
         if (m->CanTerminate()) {
             m->Terminate();
-            auto found = std::ranges::find(modules_terminating.begin(), modules_terminating.end(), m);
+            const auto found = std::ranges::find(modules_terminating, m);
             ASSERT(found != modules_terminating.end());
             modules_terminating.erase(found);
             break;

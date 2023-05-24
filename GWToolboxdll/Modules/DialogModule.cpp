@@ -45,7 +45,6 @@ namespace {
         const std::wregex button_regex(L"<a=([0-9]+)>([^<]+)(<|$)");
         std::wsmatch m;
         std::wstring subject(decoded);
-        std::wstring msg;
         GW::UI::DialogButtonInfo embedded_button{};
         embedded_button.dialog_id = 0;
         embedded_button.skill_id = 0xFFFFFFF;
@@ -55,7 +54,7 @@ namespace {
                 return;
             }
             // Technically theres no encoded string for this button, wrap it to avoid issues later.
-            msg = L"\x108\x107";
+            std::wstring msg = L"\x108\x107";
             msg += m[2].str();
             msg += L"\x1";
 
@@ -188,7 +187,7 @@ void DialogModule::Initialize() {
     }
     // NB: Can also be found via floating dialogs array in memory. We're not using hooks for any of the other floating dialogs, but would be good to document later.
     NPCDialogUICallback_Func = reinterpret_cast<GW::UI::UIInteractionCallback>(GW::Scanner::FindAssertion(
-        R"(p:\code\gw\ui\game\gmnpc.cpp)", "interactMsg.codedText && interactMsg.codedText[0]", -0xfb));
+        "p:\\code\\gw\\ui\\game\\gmnpc.cpp", "interactMsg.codedText && interactMsg.codedText[0]", -0xfb));
     if (NPCDialogUICallback_Func) {
         GW::HookBase::CreateHook(NPCDialogUICallback_Func, OnNPCDialogUICallback, reinterpret_cast<void**>(&NPCDialogUICallback_Ret));
         GW::HookBase::EnableHooks(NPCDialogUICallback_Func);
@@ -209,12 +208,12 @@ void DialogModule::SendDialog(const uint32_t dialog_id, clock_t time) {
         const uint32_t quest_id = GetQuestID(dialog_id);
         switch (GetQuestDialogType(dialog_id)) {
         case QuestDialogType::TAKE: // Dialog is for taking a quest
-            queued_dialogs_to_send[SetQuestDialogType(quest_id, QuestDialogType::ENQUIRE_NEXT)] = time;
-            queued_dialogs_to_send[SetQuestDialogType(quest_id, QuestDialogType::ENQUIRE)] = time;
+            queued_dialogs_to_send[GetDialogIDForQuestDialogType(quest_id, QuestDialogType::ENQUIRE_NEXT)] = time;
+            queued_dialogs_to_send[GetDialogIDForQuestDialogType(quest_id, QuestDialogType::ENQUIRE)] = time;
             break;
         case QuestDialogType::REWARD: // Dialog is for accepting a quest reward
-            queued_dialogs_to_send[SetQuestDialogType(quest_id, QuestDialogType::ENQUIRE_NEXT)] = time;
-            queued_dialogs_to_send[SetQuestDialogType(quest_id, QuestDialogType::ENQUIRE_REWARD)] = time;
+            queued_dialogs_to_send[GetDialogIDForQuestDialogType(quest_id, QuestDialogType::ENQUIRE_NEXT)] = time;
+            queued_dialogs_to_send[GetDialogIDForQuestDialogType(quest_id, QuestDialogType::ENQUIRE_REWARD)] = time;
             break;
         default: return;
         }
@@ -299,17 +298,23 @@ uint32_t DialogModule::AcceptFirstAvailableQuest() {
             break;
         }
     }
-    for (const auto quest_id : available_quests) {
-        if (quest_id == static_cast<uint32_t>(GW::Constants::QuestID::UW_UWG) 
-            && available_quests.size() > 1) {
-            // skip unless it's the only available dialog - certain quests almost always want to be taken last
-            continue;
-        }
+
+    const auto take_quest = [](const uint32_t quest_id) {
         SendDialogs({
-            SetQuestDialogType(quest_id,QuestDialogType::TAKE),
-            SetQuestDialogType(quest_id,QuestDialogType::REWARD)
-        });
+            GetDialogIDForQuestDialogType(quest_id, QuestDialogType::TAKE),
+            GetDialogIDForQuestDialogType(quest_id, QuestDialogType::REWARD)
+            });
         return quest_id;
+    };
+
+    // restore -> escort -> uwg
+    for (const auto quest_id : { GW::Constants::QuestID::UW_Restore, GW::Constants::QuestID::UW_Escort }) {
+        const uint32_t uquest_id = static_cast<uint32_t>(quest_id);
+        if (std::ranges::find(available_quests, uquest_id) != std::ranges::end(available_quests))
+            return take_quest(uquest_id);
+    }
+    if (!available_quests.empty()) {
+        return take_quest(available_quests[0]);
     }
     return 0;
 }

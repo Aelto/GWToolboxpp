@@ -3,12 +3,9 @@
 #include "ToastNotifications.h"
 
 #include <GWCA/Constants/Constants.h>
-
 #include <GWCA/Utilities/Hook.h>
-
 #include <GWCA/Packets/Opcodes.h>
 #include <GWCA/Packets/StoC.h>
-
 #include <GWCA/GameEntities/Party.h>
 
 #include <GWCA/Managers/ChatMgr.h>
@@ -20,11 +17,10 @@
 #include <GWCA/Managers/PartyMgr.h>
 #include <GWCA/Managers/PlayerMgr.h>
 
-#include <wintoast/wintoastlib.cpp>
+#include <wintoast/wintoastlib.h>
 #include <Utils/GuiUtils.h>
 #include <Utils/ToolboxUtils.h>
 #include <Defines.h>
-#include <GWCA/Context/PartyContext.h>
 
 namespace {
 
@@ -54,8 +50,8 @@ namespace {
     std::map<std::wstring, ToastNotifications::Toast*> toasts;
 
     bool CanNotify() {
-        bool show_toast = false;
-        auto whnd = GW::MemoryMgr::GetGWWindowHandle();
+        bool show_toast;
+        const auto whnd = GW::MemoryMgr::GetGWWindowHandle();
         if (!whnd)
             return false;
         if (IsIconic(whnd)) {
@@ -72,7 +68,7 @@ namespace {
         if (!show_toast)
             return false;
 
-        GW::Constants::InstanceType instance_type = GW::Map::GetInstanceType();
+        const auto instance_type = GW::Map::GetInstanceType();
 
         switch (instance_type) {
         case GW::Constants::InstanceType::Explorable:
@@ -188,14 +184,14 @@ namespace {
         }
         // This far; Everyone else is ticked up
         if (!player_ticked) {
-            if(show_notifications_on_last_to_ready)
+            if (show_notifications_on_last_to_ready)
                 ToastNotifications::SendToast(party_ready_toast_title, L"You're the last player in your party to tick up", OnGenericToastActivated);
             if (flash_window_on_last_to_ready)
                 FlashWindow();
         }
         else {
             // Everyone including me is ticked
-            if(show_notifications_on_everyone_ready)
+            if (show_notifications_on_everyone_ready)
                 ToastNotifications::SendToast(party_ready_toast_title, L"Everyone in your party is ticked up and ready to go!", OnGenericToastActivated);
             if (flash_window_on_everyone_ready)
                 FlashWindow();
@@ -215,7 +211,7 @@ namespace {
         uint32_t header = 0;
         GW::StoC::PacketCallback cb;
         GW::HookEntry hook_entry;
-        StoC_Callback(uint32_t _header, GW::StoC::PacketCallback _cb) : header(_header), cb(_cb) {};
+        StoC_Callback(uint32_t _header, GW::StoC::PacketCallback _cb) : header(_header), cb(_cb) {}
     };
 
     std::vector<StoC_Callback> stoc_callbacks = {
@@ -229,8 +225,7 @@ namespace {
 ToastNotifications::Toast::Toast(std::wstring _title, std::wstring _message) : title(_title), message(_message) {};
 ToastNotifications::Toast::~Toast() {
     TriggerToastCallback(this, false);
-    if (toast_template)
-        delete toast_template;
+    delete toast_template;
 }
 void ToastNotifications::Toast::toastActivated() const {  
     TriggerToastCallback(this, true);
@@ -247,7 +242,7 @@ void ToastNotifications::Toast::toastFailed() const {
 }
 bool ToastNotifications::Toast::send() {
     using namespace WinToastLib;
-    auto instance = WinToast::instance();
+    const auto instance = WinToast::instance();
     if (!instance->isCompatible())
         return false;
     if (!instance->isInitialized()) {
@@ -267,12 +262,12 @@ bool ToastNotifications::Toast::send() {
     return toast_id != -1;
 }
 bool ToastNotifications::Toast::dismiss() {
-    bool ok = toast_id == -1 ? true : WinToast::instance()->hideToast(toast_id);
+    const bool ok = toast_id == -1 ? true : WinToastLib::WinToast::instance()->hideToast(toast_id);
     toast_id = -1;
     return ok;
 }
 bool ToastNotifications::DismissToast(const wchar_t* title) {
-    auto found = toasts.find(title);
+    const auto found = toasts.find(title);
     if (found != toasts.end()) {
         delete found->second;
         toasts.erase(found);
@@ -284,7 +279,7 @@ ToastNotifications::Toast* ToastNotifications::SendToast(const wchar_t* title, c
         return nullptr;
     if (!CanNotify())
         return nullptr;
-    auto found = toasts.find(title);
+    const auto found = toasts.find(title);
     Toast* toast = found != toasts.end() ? found->second : 0;
     if (!toast) {
         toast = new Toast(title, message);
@@ -306,7 +301,7 @@ void ToastNotifications::Initialize()
 {
     ToolboxModule::Initialize();
 
-    is_platform_compatible = WinToast::instance()->isCompatible();
+    is_platform_compatible = WinToastLib::WinToast::isCompatible();
     GW::Chat::RegisterWhisperCallback(&OnWhisper_Entry, OnWhisper);
     for (auto& callback : stoc_callbacks) {
         GW::StoC::RegisterPacketCallback( &callback.hook_entry, callback.header, callback.cb, 0x8000);
@@ -323,9 +318,9 @@ void ToastNotifications::Terminate()
         GW::StoC::RemoveCallback( callback.header, &callback.hook_entry);
     }
     GW::Chat::RemoveWhisperCallback(&OnWhisper_Entry);
-    for (auto toast : toasts) {
-        TriggerToastCallback(toast.second, false);
-        delete toast.second;
+    for (const auto& toast : toasts | std::views::values) {
+        TriggerToastCallback(toast, false);
+        delete toast;
     }
     toasts.clear();
 }
