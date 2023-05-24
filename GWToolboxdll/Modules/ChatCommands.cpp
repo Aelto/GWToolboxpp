@@ -1917,8 +1917,12 @@ void ChatCommands::CmdTransmo(const wchar_t *, int argc, LPWSTR *argv) {
 
     if (argc > 1) {
         int iscale;
+        int npc_id;
         if (wcsncmp(argv[1], L"reset", 5) == 0) {
             transmo.npc_id = INT_MAX;
+        }
+        else if (wcsncmp(argv[1], L"id", 5) == 0 && argc > 2 && GuiUtils::ParseInt(argv[2], &npc_id)) {
+            transmo.npc_id = npc_id ^ 0x20000000;
         }
         else if(GuiUtils::ParseInt(argv[1], &iscale)) {
             if (!ParseScale(iscale, transmo))
