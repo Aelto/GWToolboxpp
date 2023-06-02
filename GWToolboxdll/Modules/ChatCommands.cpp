@@ -769,6 +769,7 @@ void ChatCommands::Initialize() {
         {"herta", {4537, def_scale, 0x3f82, 0x3bd82, 0x21c}},
         {"reyna", {1882, def_scale, 0x3212, 0x1fc35, 0x21c}},
         {"anzhaer", {7985, def_scale, 0x3f8f, 0x5b346, 0x20c}},
+        {"palace", {5640, def_scale, 0x1c603, 0x32c12, 0x20c}},
         {"smite", {346, def_scale, 129664, 0, 98820}},
         {"dorian", {8299, def_scale, 86510, 0, 98820}},
         {"kanaxai", {317, def_scale, 184176, 185319, 98820}},
