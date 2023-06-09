@@ -38,7 +38,7 @@ bool Download(std::string& content, const char *url)
 {
     RestClient client;
     client.SetUrl(url);
-    client.SetVerifyPeer(false);
+    client.SetVerifyPeer(true);
     client.SetTimeoutSec(5);
     client.SetUserAgent("curl/7.71.1");
     client.Execute();
@@ -56,7 +56,7 @@ bool Download(std::string& content, const char *url)
 void AsyncDownload(const char *url, AsyncFileDownloader *downloader)
 {
     downloader->SetUrl(url);
-    downloader->SetVerifyPeer(false);
+    downloader->SetVerifyPeer(true);
     downloader->SetFollowLocation(true);
     downloader->SetUserAgent("curl/7.71.1");
     downloader->ExecuteAsync();

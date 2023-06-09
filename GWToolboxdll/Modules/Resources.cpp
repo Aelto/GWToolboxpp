@@ -131,9 +131,9 @@ namespace {
         ASSERT(snprintf(user_agent_str, sizeof(user_agent_str), "GWToolboxpp/%s", GWTOOLBOXDLL_VERSION) != -1);
         r->SetUserAgent(user_agent_str);
         r->SetFollowLocation(true);
-        r->SetVerifyPeer(false); // idc about mitm or out of date certs
+        r->SetVerifyPeer(true); // idc about mitm or out of date certs
         r->SetMethod(HttpMethod::Get);
-        r->SetVerifyHost(false);
+        r->SetVerifyHost(true);
     }
 }
 
