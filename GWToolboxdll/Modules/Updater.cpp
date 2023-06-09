@@ -150,6 +150,7 @@ namespace {
 
 
         // 1. rename toolbox dll
+        if (false) {
         const auto dllold = std::wstring(dllfile) + L".old";
         Log::Log("moving to %s\n", dllold.c_str());
         DeleteFileW(dllold.c_str());
@@ -168,6 +169,7 @@ namespace {
                     step = Done;
                 }
             });
+        }
     }
 
 }
