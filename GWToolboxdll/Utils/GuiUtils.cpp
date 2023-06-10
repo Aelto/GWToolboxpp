@@ -307,16 +307,18 @@ namespace GuiUtils {
         return rect;
     }
     float GetPartyHealthbarHeight() {
-        const auto interfacesize =
-            static_cast<GW::Constants::InterfaceSize>(GW::UI::GetPreference(GW::UI::EnumPreference::InterfaceSize));
-        switch (interfacesize) {
-        case GW::Constants::InterfaceSize::SMALL: return GW::Constants::HealthbarHeight::Small;
-        case GW::Constants::InterfaceSize::NORMAL: return GW::Constants::HealthbarHeight::Normal;
-        case GW::Constants::InterfaceSize::LARGE: return GW::Constants::HealthbarHeight::Large;
-        case GW::Constants::InterfaceSize::LARGER: return GW::Constants::HealthbarHeight::Larger;
-        default:
-            return GW::Constants::HealthbarHeight::Normal;
-        }
+        return GW::Constants::HealthbarHeight::Larger;
+
+        // const auto interfacesize =
+        //     static_cast<GW::Constants::InterfaceSize>(GW::UI::GetPreference(GW::UI::EnumPreference::InterfaceSize));
+        // switch (interfacesize) {
+        // case GW::Constants::InterfaceSize::SMALL: return GW::Constants::HealthbarHeight::Small;
+        // case GW::Constants::InterfaceSize::NORMAL: return GW::Constants::HealthbarHeight::Normal;
+        // case GW::Constants::InterfaceSize::LARGE: return GW::Constants::HealthbarHeight::Large;
+        // case GW::Constants::InterfaceSize::LARGER: return GW::Constants::HealthbarHeight::Larger;
+        // default:
+        //     return GW::Constants::HealthbarHeight::Normal;
+        // }
     }
     std::string ToSlug(std::string s) {
         s = RemovePunctuation(s);

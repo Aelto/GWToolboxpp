@@ -223,6 +223,8 @@ float Resources::GetGWScaleMultiplier(bool force) {
         case GW::Constants::InterfaceSize::LARGER: cached_ui_scale = 1.3333333f; break;
         default: cached_ui_scale = 1.f; break;
         }
+
+        cached_ui_scale = 1.3333333f;
     }
     return cached_ui_scale;
 }
