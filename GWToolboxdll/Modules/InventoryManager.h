@@ -48,7 +48,6 @@ public:
         None,
         All,
         Blue,
-        BlueAndHigher,
         Purple,
         Gold
     };
@@ -112,6 +111,7 @@ private:
     bool hide_unsellable_items = false;
     bool hide_weapon_sets_and_customized_items = false;
     std::map<uint32_t, std::string> hide_from_merchant_items{};
+    bool identify_white_items = true;
     bool salvage_rare_mats = false;
     bool salvage_nicholas_items = false;
     bool show_transact_quantity_popup = false;

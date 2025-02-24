@@ -1035,6 +1035,7 @@ void InventoryManager::SaveSettings(ToolboxIni* ini)
     SAVE_BOOL(right_click_context_menu_in_explorable);
     SAVE_BOOL(move_to_trade_on_double_click);
     SAVE_BOOL(move_to_trade_on_alt_click);
+    SAVE_BOOL(identify_white_items);
 
     ini->SetBoolValue(Name(), VAR_NAME(salvage_from_backpack), bags_to_salvage_from[GW::Constants::Bag::Backpack]);
     ini->SetBoolValue(Name(), VAR_NAME(salvage_from_belt_pouch), bags_to_salvage_from[GW::Constants::Bag::Belt_Pouch]);
@@ -1059,6 +1060,7 @@ void InventoryManager::LoadSettings(ToolboxIni* ini)
     LOAD_BOOL(right_click_context_menu_in_explorable);
     LOAD_BOOL(move_to_trade_on_double_click);
     LOAD_BOOL(move_to_trade_on_alt_click);
+    LOAD_BOOL(identify_white_items);
 
     bags_to_salvage_from[GW::Constants::Bag::Backpack] = ini->GetBoolValue(Name(), VAR_NAME(salvage_from_backpack), bags_to_salvage_from[GW::Constants::Bag::Backpack]);
     bags_to_salvage_from[GW::Constants::Bag::Belt_Pouch] = ini->GetBoolValue(Name(), VAR_NAME(salvage_from_belt_pouch), bags_to_salvage_from[GW::Constants::Bag::Belt_Pouch]);
@@ -1471,7 +1473,10 @@ InventoryManager::Item* InventoryManager::GetNextUnidentifiedItem(const Item* st
             }
             switch (identify_all_type) {
                 case IdentifyAllType::All:
-                    return item;
+                    if (identify_white_items || item->IsBlue() || item->IsPurple() || item->IsGold()) {
+                        return item;
+                    }
+                    break;
                 case IdentifyAllType::Blue:
                     if (item->IsBlue()) {
                         return item;
@@ -1487,8 +1492,6 @@ InventoryManager::Item* InventoryManager::GetNextUnidentifiedItem(const Item* st
                         return item;
                     }
                     break;
-                case IdentifyAllType::BlueAndHigher:
-                    if (item->IsBlue() || item->IsPurple() || item->IsGold()) {
                         return item;
                     }
                     break;
@@ -1754,6 +1757,11 @@ void InventoryManager::DrawSettingsInternal()
     ImGui::Checkbox("Exporable Area", &right_click_context_menu_in_explorable);
     ImGui::SameLine();
     ImGui::Checkbox("Outpost", &right_click_context_menu_in_outpost);
+    ImGui::Unindent();
+    ImGui::Text("Identify All options:");
+    ImGui::Indent();
+    ImGui::Checkbox("Identify white items", &identify_white_items);
+    ImGui::ShowHelp("Untick to skip white items during Identify All operations");
     ImGui::Unindent();
     ImGui::Text("Salvage All options:");
     ImGui::SameLine();
@@ -2166,9 +2174,6 @@ bool InventoryManager::DrawItemContextMenu(const bool open)
         ImGui::PushStyleColor(ImGuiCol_Text, ItemBlue);
         if (ImGui::Button("Identify All Blue Items", size)) {
             type = IdentifyAllType::Blue;
-        }
-        if (ImGui::Button("Identify All Blue & Higher Items", size)) {
-            type = IdentifyAllType::BlueAndHigher;
         }
         ImGui::PushStyleColor(ImGuiCol_Text, ItemPurple);
         if (ImGui::Button("Identify All Purple Items", size)) {
