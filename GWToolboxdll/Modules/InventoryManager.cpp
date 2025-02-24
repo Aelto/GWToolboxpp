@@ -1487,6 +1487,11 @@ InventoryManager::Item* InventoryManager::GetNextUnidentifiedItem(const Item* st
                         return item;
                     }
                     break;
+                case IdentifyAllType::BlueAndHigher:
+                    if (item->IsBlue() || item->IsPurple() || item->IsGold()) {
+                        return item;
+                    }
+                    break;
                 default:
                     break;
             }
@@ -2161,6 +2166,9 @@ bool InventoryManager::DrawItemContextMenu(const bool open)
         ImGui::PushStyleColor(ImGuiCol_Text, ItemBlue);
         if (ImGui::Button("Identify All Blue Items", size)) {
             type = IdentifyAllType::Blue;
+        }
+        if (ImGui::Button("Identify All Blue & Higher Items", size)) {
+            type = IdentifyAllType::BlueAndHigher;
         }
         ImGui::PushStyleColor(ImGuiCol_Text, ItemPurple);
         if (ImGui::Button("Identify All Purple Items", size)) {
