@@ -1492,9 +1492,6 @@ InventoryManager::Item* InventoryManager::GetNextUnidentifiedItem(const Item* st
                         return item;
                     }
                     break;
-                        return item;
-                    }
-                    break;
                 default:
                     break;
             }
