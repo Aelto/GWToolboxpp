@@ -155,10 +155,10 @@ public:
         bool IsLesserKit() const;
         bool IsExpertSalvageKit() const;
         bool IsPerfectSalvageKit() const;
-        bool IsWeapon();
-        bool IsArmor();
-        bool IsSalvagable(bool check_bag = true);
-        bool IsHiddenFromMerchants();
+        bool IsWeapon() const;
+        bool IsArmor() const;
+        bool IsSalvagable(bool check_bag = true) const;
+        bool IsHiddenFromMerchants() const;
 
         bool IsInventoryItem() const;
         bool IsStorageItem() const;
@@ -225,12 +225,16 @@ public:
         {
             return (interaction & 0x20000) != 0;
         }
+
+        [[nodiscard]] bool IsWhite() const { return !IsBlue() && !IsPurple() && !IsGold() && !IsGreen(); }
     };
 
     Item* GetNextUnsalvagedItem(const Item* salvage_kit = nullptr, const Item* start_after_item = nullptr);
     Item* GetNextUnidentifiedItem(const Item* start_after_item = nullptr) const;
+    Item* GetNextIdentificationKit(const Item* start_after_item = nullptr) const;
+    Item* GetNextSalvageKit(const Item* start_after_item = nullptr) const;
     void Identify(const Item* item, const Item* kit);
-    void Salvage(Item* item, const Item* kit);
+    void Salvage(const Item* item, const Item* kit);
 
     uint32_t stack_prompt_item_id = 0;
 
@@ -316,6 +320,38 @@ private:
         bool proceed = true;
     };
 
+
+    class AutomaticItemHandler {
+    public:
+        void on_item_looted(InventoryManager& inventory, const uint32_t item_id);
+        void identify_last_looted_item(InventoryManager& inventory);
+        void salvage_last_looted_item(InventoryManager& inventory);
+
+        void DrawSettingsInternal();
+        void SaveSettings(const char* section, ToolboxIni* ini) const;
+        void LoadSettings(const char* section, ToolboxIni* ini);
+
+    private:
+        bool automatic_item_management_enabled = false;
+        bool automatic_item_identification = false;
+        bool automatic_item_identification_whites = false;
+        bool automatic_item_identification_blues = false;
+        bool automatic_item_identification_purples = false;
+        bool automatic_item_identification_golds = false;
+
+        bool automatic_item_salvage = false;
+        bool automatic_item_salvage_whites = false;
+        bool automatic_item_salvage_blues = false;
+        bool automatic_item_salvage_purples = false;
+        bool automatic_item_salvage_golds = false;
+        bool automatic_item_salvage_nicholas_soon = false;
+
+        const Item* last_looted_item = nullptr;
+        clock_t last_looted_timestamp = 0;
+
+        bool does_item_need_identifying(const Item& item);
+    };
+
     std::vector<PotentialItem*> potential_salvage_all_items{}; // List of items that would be processed if user confirms Salvage All
     void ClearPotentialItems();
     PendingItem pending_identify_item;
@@ -333,4 +369,6 @@ private:
     clock_t pending_identify_at = 0;
     PendingItem context_item;
     bool pending_cancel_salvage = false;
+
+    AutomaticItemHandler automatic_item_handler;
 };

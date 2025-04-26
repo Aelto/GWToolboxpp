@@ -915,6 +915,23 @@ void InventoryManager::OnUIMessage(GW::HookStatus* status, const GW::UI::UIMessa
             OnUseItem(status, (uint32_t)wparam);
         }
         break;
+        case GW::UI::UIMessage::kInventorySlotUpdated: {
+            // the game updates every inventory slot on map load, ignore all updates
+            // at the start of an instance
+            // const auto second = 1000;
+            if (GameSettings::GetIsLoading()) {
+                return;
+            }
+
+            struct SlotUpdatedData {
+                uint32_t unknown_0;
+                uint32_t item_id;
+                uint32_t bag_id;
+            };
+
+            auto data = static_cast<SlotUpdatedData*>(wparam);
+            instance.automatic_item_handler.on_item_looted(instance, data->item_id);
+        } break;
         default:
             ASSERT(false); // Subscribed to a UI message that we don't use!
     }
@@ -941,7 +958,8 @@ void InventoryManager::Initialize()
         GW::UI::UIMessage::kMoveItem,
         GW::UI::UIMessage::kSendUseItem,
         GW::UI::UIMessage::kItemUpdated,
-        GW::UI::UIMessage::kVendorWindow
+        GW::UI::UIMessage::kVendorWindow,
+        GW::UI::UIMessage::kInventorySlotUpdated
     };
     for (const auto message_id : message_id_hooks) {
         RegisterUIMessageCallback(&ItemClick_Entry, message_id, OnUIMessage);
@@ -1040,6 +1058,8 @@ void InventoryManager::SaveSettings(ToolboxIni* ini)
     SAVE_BOOL(salvage_all_on_ctrl_click);
     SAVE_BOOL(identify_all_on_ctrl_click);
 
+    this->automatic_item_handler.SaveSettings(this->Name(), ini);
+
     ini->SetBoolValue(Name(), VAR_NAME(salvage_from_backpack), bags_to_salvage_from[GW::Constants::Bag::Backpack]);
     ini->SetBoolValue(Name(), VAR_NAME(salvage_from_belt_pouch), bags_to_salvage_from[GW::Constants::Bag::Belt_Pouch]);
     ini->SetBoolValue(Name(), VAR_NAME(salvage_from_bag_1), bags_to_salvage_from[GW::Constants::Bag::Bag_1]);
@@ -1065,6 +1085,8 @@ void InventoryManager::LoadSettings(ToolboxIni* ini)
     LOAD_BOOL(move_to_trade_on_alt_click);
     LOAD_BOOL(salvage_all_on_ctrl_click);
     LOAD_BOOL(identify_all_on_ctrl_click);
+
+    this->automatic_item_handler.LoadSettings(this->Name(), ini);
 
     bags_to_salvage_from[GW::Constants::Bag::Backpack] = ini->GetBoolValue(Name(), VAR_NAME(salvage_from_backpack), bags_to_salvage_from[GW::Constants::Bag::Backpack]);
     bags_to_salvage_from[GW::Constants::Bag::Belt_Pouch] = ini->GetBoolValue(Name(), VAR_NAME(salvage_from_belt_pouch), bags_to_salvage_from[GW::Constants::Bag::Belt_Pouch]);
@@ -1203,6 +1225,9 @@ void InventoryManager::ContinueIdentify()
     }
     if (is_identifying_all) {
         IdentifyAll(identify_all_type);
+    }
+    else {
+        this->automatic_item_handler.salvage_last_looted_item(*this);
     }
 }
 
@@ -1377,7 +1402,7 @@ void InventoryManager::SalvageAll(const SalvageAllType type)
     Salvage(item, kit);
 }
 
-void InventoryManager::Salvage(Item* item, const Item* kit)
+void InventoryManager::Salvage(const Item* item, const Item* kit)
 {
     if (!item || !kit) {
         return;
@@ -1500,6 +1525,66 @@ InventoryManager::Item* InventoryManager::GetNextUnidentifiedItem(const Item* st
     }
     return nullptr;
 }
+
+
+InventoryManager::Item* InventoryManager::GetNextIdentificationKit(const Item* start_after_item) const
+{
+    size_t start_slot = 0;
+    auto start_bag_id = GW::Constants::Bag::Backpack;
+    if (start_after_item) {
+        get_next_bag_slot(start_after_item, &start_bag_id, &start_slot);
+    }
+
+    for (auto bag_id = start_bag_id; bag_id <= GW::Constants::Bag::Equipment_Pack; bag_id++) {
+        GW::Bag* bag = GW::Items::GetBag(bag_id);
+        size_t slot = start_slot;
+        start_slot = 0;
+        if (!bag) {
+            continue;
+        }
+        GW::ItemArray& items = bag->items;
+        for (size_t i = slot, size = items.size(); i < size; i++) {
+            const auto item = static_cast<Item*>(items[i]);
+            if (!item) {
+                continue;
+            }
+            if (item->IsIdentificationKit()) {
+                return item;
+            }
+        }
+    }
+    return nullptr;
+}
+
+InventoryManager::Item* InventoryManager::GetNextSalvageKit(const Item* start_after_item) const
+{
+    size_t start_slot = 0;
+    auto start_bag_id = GW::Constants::Bag::Backpack;
+    if (start_after_item) {
+        get_next_bag_slot(start_after_item, &start_bag_id, &start_slot);
+    }
+
+    for (auto bag_id = start_bag_id; bag_id <= GW::Constants::Bag::Equipment_Pack; bag_id++) {
+        GW::Bag* bag = GW::Items::GetBag(bag_id);
+        size_t slot = start_slot;
+        start_slot = 0;
+        if (!bag) {
+            continue;
+        }
+        GW::ItemArray& items = bag->items;
+        for (size_t i = slot, size = items.size(); i < size; i++) {
+            const auto item = static_cast<Item*>(items[i]);
+            if (!item) {
+                continue;
+            }
+            if (item->IsSalvageKit()) {
+                return item;
+            }
+        }
+    }
+    return nullptr;
+}
+
 
 InventoryManager::Item* InventoryManager::GetNextUnsalvagedItem(const Item* kit, const Item* start_after_item)
 {
@@ -1777,6 +1862,9 @@ void InventoryManager::DrawSettingsInternal()
     ImGui::ShowHelp("Control+Click a salvage kit to open the Salvage All window");
     ImGui::Checkbox("Identify All with Control+Click", &identify_all_on_ctrl_click);
     ImGui::ShowHelp("Control+Click an identification kit to identify all items with it");
+
+    ImGui::Separator();
+    this->automatic_item_handler.DrawSettingsInternal();
 
     ImGui::Separator();
     ImGui::Text("Hide items from merchant sell window:");
@@ -2393,7 +2481,7 @@ bool InventoryManager::Item::CanOfferToTrade() const
     return IsTradable() && IsTradeWindowOpen() && !IsOfferedInTrade() && player_items->size() < 7;
 }
 
-bool InventoryManager::Item::IsSalvagable(bool check_bag)
+bool InventoryManager::Item::IsSalvagable(bool check_bag) const
 {
     if (item_formula == 0x5da) {
         return false;
@@ -2427,7 +2515,7 @@ bool InventoryManager::Item::IsSalvagable(bool check_bag)
     return false;
 }
 
-bool InventoryManager::Item::IsWeapon()
+bool InventoryManager::Item::IsWeapon() const
 {
     switch (static_cast<GW::Constants::ItemType>(type)) {
         case GW::Constants::ItemType::Axe:
@@ -2447,7 +2535,7 @@ bool InventoryManager::Item::IsWeapon()
     }
 }
 
-bool InventoryManager::Item::IsArmor()
+bool InventoryManager::Item::IsArmor() const
 {
     switch (static_cast<GW::Constants::ItemType>(type)) {
         case GW::Constants::ItemType::Headpiece:
@@ -2461,7 +2549,7 @@ bool InventoryManager::Item::IsArmor()
     }
 }
 
-bool InventoryManager::Item::IsHiddenFromMerchants()
+bool InventoryManager::Item::IsHiddenFromMerchants() const
 {
     if (Instance().hide_unsellable_items && !value) {
         return true;
@@ -2655,3 +2743,181 @@ void InventoryManager::PendingItem::PluralEncString::sanitise()
         decoded_ws = decoded_ws.substr(2);
     }
 }
+
+
+void InventoryManager::AutomaticItemHandler::on_item_looted(InventoryManager& inventory, const uint32_t item_id)
+{
+    Item* item = static_cast<Item*>(GW::Items::GetItemById(item_id));
+
+    this->last_looted_item = item;
+    this->last_looted_timestamp = clock();
+
+    this->identify_last_looted_item(inventory);
+}
+
+void InventoryManager::AutomaticItemHandler::identify_last_looted_item(InventoryManager& inventory)
+{
+    if (!this->automatic_item_management_enabled || !this->automatic_item_identification) {
+        return;
+    }
+
+    if (this->last_looted_item == nullptr) {
+        return;
+    }
+
+    if (!this->does_item_need_identifying(*this->last_looted_item)) {
+        return this->salvage_last_looted_item(inventory);
+    }
+
+    auto kit = inventory.GetNextIdentificationKit();
+    if (kit == nullptr) {
+        return;
+    }
+
+    const auto rarity = this->last_looted_item->GetRarity();
+    bool can_identify = rarity == GW::Constants::Rarity::Blue && this->automatic_item_identification_blues
+        || rarity == GW::Constants::Rarity::Purple && this->automatic_item_identification_purples
+        || rarity == GW::Constants::Rarity::Purple && this->automatic_item_identification_golds
+        || rarity == GW::Constants::Rarity::White && this->automatic_item_identification_whites;
+
+    if (can_identify) {
+        inventory.Identify(this->last_looted_item, kit);
+    }
+}
+
+void InventoryManager::AutomaticItemHandler::salvage_last_looted_item(InventoryManager& inventory) {
+    if (!this->automatic_item_management_enabled || !this->automatic_item_salvage) {
+        return;
+    }
+
+    if (this->last_looted_item == nullptr) {
+        return;
+    }
+
+    if (this->does_item_need_identifying(*this->last_looted_item)) {
+        // perform an ID of the thing first, the events will send us back here afterward:
+        return this->identify_last_looted_item(inventory);
+    }
+
+    if (!this->last_looted_item->IsSalvagable() || this->last_looted_item->IsRareMaterial() || this->last_looted_item->IsArmor() || this->last_looted_item->IsHiddenFromMerchants() || this->last_looted_item->customized || this->last_looted_item->equipped) {
+        return;
+    }
+
+    auto kit = inventory.GetNextSalvageKit();
+    if (kit == nullptr) {
+        return;
+    }
+
+    const auto rarity = this->last_looted_item->GetRarity();
+    bool can_salvage = rarity == GW::Constants::Rarity::Blue && this->automatic_item_salvage_blues
+        || rarity == GW::Constants::Rarity::Purple && this->automatic_item_salvage_purples
+        || rarity == GW::Constants::Rarity::Gold && this->automatic_item_salvage_golds
+        || rarity == GW::Constants::Rarity::White && this->automatic_item_salvage_whites;
+
+    // perform a check on nicholas items that are coming soon if this item is white and if the settings
+    // allow it, in which case we'll do an early return to abort it:
+    if (this->automatic_item_salvage_nicholas_soon && rarity == GW::Constants::Rarity::White) {
+        const auto nicholas_info = DailyQuests::GetNicholasItemInfo(this->last_looted_item->name_enc);
+        if (nicholas_info) {
+            const auto collection_time = DailyQuests::GetTimestampFromNicholasTheTraveller(nicholas_info);
+            const auto current_time = time(nullptr);
+
+            const auto one_second = 1;
+            const auto one_minute = one_second * 60;
+            const auto one_hour = one_minute * 60;
+            const auto one_day = one_hour * 24;
+            const auto one_week = one_day * 7;
+
+            if (abs(collection_time - current_time) <= one_week * 4) {
+                return;
+            }
+        }
+    }
+
+    if (can_salvage) {
+        inventory.Salvage(this->last_looted_item, kit);
+    }
+}
+
+void InventoryManager::AutomaticItemHandler::DrawSettingsInternal() {
+    ImGui::Text("Automatic Item Management");
+    ImGui::ShowHelp("Automatically identify & salvage items when looted");
+    ImGui::Checkbox("Enable item management", &this->automatic_item_management_enabled);
+
+    if (this->automatic_item_management_enabled) {
+        ImGui::Indent();
+        ImGui::Checkbox("Identify looted items", &this->automatic_item_identification);
+        if (this->automatic_item_identification) {
+            ImGui::Indent();
+            ImGui::Checkbox("ID White items", &this->automatic_item_identification_whites);
+            ImGui::Checkbox("ID Blue items", &this->automatic_item_identification_blues);
+            ImGui::Checkbox("ID Purple items", &this->automatic_item_identification_purples);
+            ImGui::Checkbox("ID Yellow items", &this->automatic_item_identification_golds);
+            ImGui::Unindent();
+        }
+
+        ImGui::Checkbox("Salvage looted items to materials", &this->automatic_item_salvage);
+        if (this->automatic_item_salvage) {
+            ImGui::Indent();
+            ImGui::Checkbox("Salvage White items", &this->automatic_item_salvage_whites);
+            if (this->automatic_item_salvage_whites) {
+                ImGui::Indent();
+                ImGui::Checkbox("Ignore coming Nicholas items", &this->automatic_item_salvage_nicholas_soon);
+                ImGui::Unindent();
+            }
+            ImGui::Checkbox("Salvage Blue items", &this->automatic_item_salvage_blues);
+            ImGui::Checkbox("Salvage Purple items", &this->automatic_item_salvage_purples);
+            ImGui::Checkbox("Salvage Yellow items", &this->automatic_item_salvage_golds);
+            ImGui::Unindent();
+        }
+        ImGui::Unindent();
+    }
+}
+
+void InventoryManager::AutomaticItemHandler::SaveSettings(const char* section, ToolboxIni* ini) const
+{
+    ini->SetBoolValue(section, "automatic_item_management_enabled", automatic_item_management_enabled);
+    ini->SetBoolValue(section, "automatic_item_identification", automatic_item_identification);
+    ini->SetBoolValue(section, "automatic_item_identification_whites", automatic_item_identification_whites);
+    ini->SetBoolValue(section, "automatic_item_identification_blues", automatic_item_identification_blues);
+    ini->SetBoolValue(section, "automatic_item_identification_purples", automatic_item_identification_purples);
+    ini->SetBoolValue(section, "automatic_item_identification_golds", automatic_item_identification_golds);
+
+    ini->SetBoolValue(section, "automatic_item_salvage", automatic_item_salvage);
+    ini->SetBoolValue(section, "automatic_item_salvage_whites", automatic_item_salvage_whites);
+    ini->SetBoolValue(section, "automatic_item_salvage_blues", automatic_item_salvage_blues);
+    ini->SetBoolValue(section, "automatic_item_salvage_purples", automatic_item_salvage_purples);
+    ini->SetBoolValue(section, "automatic_item_salvage_golds", automatic_item_salvage_golds);
+
+    ini->SetBoolValue(section, "automatic_item_salvage_nicholas_soon", automatic_item_salvage_nicholas_soon);
+}
+
+void InventoryManager::AutomaticItemHandler::LoadSettings(const char* section, ToolboxIni* ini)
+{
+    automatic_item_management_enabled = ini->GetBoolValue(section, "automatic_item_management_enabled", automatic_item_management_enabled);
+    automatic_item_identification = ini->GetBoolValue(section, "automatic_item_identification", automatic_item_identification);
+    automatic_item_identification_whites = ini->GetBoolValue(section, "automatic_item_identification_whites", automatic_item_identification_whites);
+    automatic_item_identification_blues = ini->GetBoolValue(section, "automatic_item_identification_blues", automatic_item_identification_blues);
+    automatic_item_identification_purples = ini->GetBoolValue(section, "automatic_item_identification_purples", automatic_item_identification_purples);
+    automatic_item_identification_golds = ini->GetBoolValue(section, "automatic_item_identification_golds", automatic_item_identification_golds);
+
+    automatic_item_salvage = ini->GetBoolValue(section, "automatic_item_salvage", automatic_item_salvage);
+    automatic_item_salvage_whites = ini->GetBoolValue(section, "automatic_item_salvage_whites", automatic_item_salvage_whites);
+    automatic_item_salvage_blues = ini->GetBoolValue(section, "automatic_item_salvage_blues", automatic_item_salvage_blues);
+    automatic_item_salvage_purples = ini->GetBoolValue(section, "automatic_item_salvage_purples", automatic_item_salvage_purples);
+    automatic_item_salvage_golds = ini->GetBoolValue(section, "automatic_item_salvage_golds", automatic_item_salvage_golds);
+
+    automatic_item_salvage_nicholas_soon = ini->GetBoolValue(section, "automatic_item_salvage_nicholas_soon", automatic_item_salvage_nicholas_soon);
+}
+
+bool InventoryManager::AutomaticItemHandler::does_item_need_identifying(const Item& item)
+{
+    const auto rarity = item.GetRarity();
+
+    if (rarity == GW::Constants::Rarity::White) {
+        return this->automatic_item_identification_whites && !item.GetIsIdentified();
+    }
+
+    return !item.GetIsIdentified();
+}
+

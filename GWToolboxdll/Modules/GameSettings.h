@@ -59,6 +59,8 @@ public:
     static void DrawPartySettings();
 
     static bool GetSettingBool(const char* setting);
+    static clock_t GetTimeSinceInstanceLoadStart();
+    static bool GetIsLoading();
 
     void Update(float delta) override;
     bool WndProc(UINT Message, WPARAM wParam, LPARAM lParam) override;
@@ -70,6 +72,7 @@ public:
     static void OnAgentEffect(GW::HookStatus*, const GW::Packet::StoC::GenericValue*);
     static void OnPartyDefeated(const GW::HookStatus*, GW::Packet::StoC::PartyDefeated*);
     void OnDungeonReward(GW::HookStatus*, GW::Packet::StoC::DungeonReward*) const;
+    static void OnInstanceLoadStart(GW::HookStatus*, GW::Packet::StoC::InstanceLoadStart*);
     static void OnMapLoaded(GW::HookStatus*, GW::Packet::StoC::MapLoaded*);
     static void OnCinematic(const GW::HookStatus*, const GW::Packet::StoC::CinematicPlay*);
     static void OnMapTravel(const GW::HookStatus*, const GW::Packet::StoC::GameSrvTransfer*);

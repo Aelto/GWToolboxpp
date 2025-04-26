@@ -126,6 +126,7 @@ namespace {
     clock_t last_send = 0;
 
     clock_t instance_entered_at = 0;
+    clock_t instance_load_started_at = 0;
 
     bool disable_item_descriptions_in_outpost = false;
     bool disable_item_descriptions_in_explorable = false;
@@ -1670,6 +1671,7 @@ void GameSettings::Initialize()
     GW::StoC::RegisterPacketCallback<GW::Packet::StoC::GameSrvTransfer>(&GameSrvTransfer_Entry, OnMapTravel);
     GW::StoC::RegisterPacketCallback<GW::Packet::StoC::CinematicPlay>(&CinematicPlay_Entry, OnCinematic);
     GW::StoC::RegisterPacketCallback<GW::Packet::StoC::DungeonReward>(&VanquishComplete_Entry, bind_member(this, &GameSettings::OnDungeonReward));
+    GW::StoC::RegisterPacketCallback<GW::Packet::StoC::InstanceLoadStart>(&PlayerJoinInstance_Entry, OnInstanceLoadStart);
     GW::StoC::RegisterPacketCallback<GW::Packet::StoC::MapLoaded>(&PlayerJoinInstance_Entry, OnMapLoaded);
     GW::StoC::RegisterPacketCallback<GW::Packet::StoC::PlayerJoinInstance>(&PlayerJoinInstance_Entry, OnPlayerJoinInstance);
     GW::StoC::RegisterPacketCallback<GW::Packet::StoC::PlayerLeaveInstance>(&PlayerLeaveInstance_Entry, OnPlayerLeaveInstance);
@@ -2799,6 +2801,22 @@ void GameSettings::OnMapLoaded(GW::HookStatus*, GW::Packet::StoC::MapLoaded*)
 {
     instance_entered_at = TIMER_INIT();
     SetWindowTitle(set_window_title_as_charname);
+}
+
+void GameSettings::OnInstanceLoadStart(GW::HookStatus*, GW::Packet::StoC::InstanceLoadStart*) {
+    instance_load_started_at = TIMER_INIT();
+}
+
+clock_t GameSettings::GetTimeSinceInstanceLoadStart()
+{
+    return TIMER_DIFF(instance_load_started_at);
+}
+
+bool GameSettings::GetIsLoading() {
+    // as the entered_at timer is set at the end of a loading screen while the started_at is set
+    // at the start, If start_at is greater (more recent) than entered_at then it means the player
+    // is yet to enter the instance as he's still loading.
+    return instance_load_started_at >= instance_entered_at;
 }
 
 // Hide more than 10 signets of capture
